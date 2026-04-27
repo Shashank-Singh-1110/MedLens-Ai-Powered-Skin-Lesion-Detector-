@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedLens — AI Skin Lesion Analyzer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+    --bg-deep: #f0f4f8;
+    --bg-card: #ffffff;
+    --bg-elevated: #e8edf2;
+    --border: #dce3eb;
+    --border-hover: #c1cdd8;
+    --accent: #0d9488;
+    --accent-dim: rgba(13,148,136,0.06);
+    --accent-glow: rgba(13,148,136,0.12);
+    --danger: #e11d48;
+    --danger-dim: rgba(225,29,72,0.05);
+    --warning: #d97706;
+    --warning-dim: rgba(217,119,6,0.06);
+    --text-1: #1e293b;
+    --text-2: #546478;
+    --text-3: #8896a6;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: 'Outfit', sans-serif;
+    background: var(--bg-deep);
+    color: var(--text-1);
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    top: -40%; left: -40%;
+    width: 180%; height: 180%;
+    background: radial-gradient(ellipse at 30% 10%, rgba(13,148,136,0.05) 0%, transparent 55%),
+                radial-gradient(ellipse at 75% 85%, rgba(59,130,246,0.04) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: -1;
+}
+
+body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.015'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.25;
+}
+
+/* ===== NAV ===== */
+.nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,0.82);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 32px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.nav-brand {
+    display: flex; align-items: center; gap: 14px;
+}
+.nav-logo {
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #0d9488 0%, #0284c7 100%);
+    display: grid; place-items: center;
+    font-size: 20px;
+    box-shadow: 0 3px 14px rgba(13,148,136,0.25);
+}
+.nav-title {
+    font-size: 21px; font-weight: 700;
+    letter-spacing: -0.4px;
+    color: var(--text-1);
+}
+.nav-title span { color: var(--accent); }
+.nav-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--text-3);
+    padding: 3px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    background: var(--bg-card);
+}
+.nav-status {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--text-3);
+}
+.nav-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 10px rgba(16,185,129,0.5);
+    animation: pulse-dot 2s ease infinite;
+}
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+}
+
+/* ===== LAYOUT ===== */
+.container {
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+}
+
+/* ===== HERO ===== */
+.hero {
+    text-align: center;
+    margin-bottom: 44px;
+    animation: fadeUp 0.6s ease;
+}
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(18px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.hero h1 {
+    font-size: 44px;
+    font-weight: 800;
+    letter-spacing: -1.8px;
+    line-height: 1.08;
+    margin-bottom: 14px;
+    color: var(--text-1);
+}
+.hero h1 .highlight {
+    background: linear-gradient(135deg, #0d9488, #0284c7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.hero p {
+    font-size: 16px;
+    color: var(--text-2);
+    max-width: 500px;
+    margin: 0 auto;
+    line-height: 1.65;
+}
+
+/* ===== UPLOAD ===== */
+.upload-area {
+    position: relative;
+    border: 2px dashed var(--border-hover);
+    border-radius: 20px;
+    padding: 56px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.35s cubic-bezier(0.4,0,0.2,1);
+    background: var(--bg-card);
+    overflow: hidden;
+    animation: fadeUp 0.6s ease 0.1s both;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+}
+.upload-area::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 50%, var(--accent-glow) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.35s;
+}
+.upload-area:hover::before,
+.upload-area.dragover::before { opacity: 1; }
+.upload-area:hover,
+.upload-area.dragover {
+    border-color: var(--accent);
+    box-shadow: 0 4px 30px rgba(13,148,136,0.08);
+}
+.upload-area.has-image {
+    padding: 28px;
+    border-style: solid;
+    border-color: var(--border);
+}
+.upload-icon-wrap {
+    width: 72px; height: 72px;
+    border-radius: 20px;
+    background: var(--accent-dim);
+    display: grid; place-items: center;
+    margin: 0 auto 20px;
+    font-size: 28px;
+    transition: transform 0.3s;
+    position: relative;
+}
+.upload-area:hover .upload-icon-wrap { transform: scale(1.06); }
+.upload-title {
+    font-size: 17px; font-weight: 600;
+    margin-bottom: 6px;
+    position: relative;
+    color: var(--text-1);
+}
+.upload-sub {
+    font-size: 13px; color: var(--text-3);
+    position: relative;
+}
+.upload-sub kbd {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-2);
+}
+.upload-preview {
+    max-width: 300px; max-height: 300px;
+    border-radius: 14px;
+    object-fit: cover;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.08);
+}
+#file-input { display: none; }
+
+/* ===== BUTTONS ===== */
+.actions {
+    display: flex; gap: 12px;
+    justify-content: center;
+    margin-top: 28px;
+    animation: fadeUp 0.6s ease 0.2s both;
+    flex-wrap: wrap;
+}
+.btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 13px 26px;
+    border: none; border-radius: 12px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 14px; font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+    position: relative;
+    overflow: hidden;
+}
+.btn-accent {
+    background: linear-gradient(135deg, #0d9488, #0f766e);
+    color: #ffffff;
+    box-shadow: 0 3px 14px rgba(13,148,136,0.2);
+}
+.btn-accent:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 28px rgba(13,148,136,0.28);
+}
+.btn-accent:disabled { opacity: 0.35; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-ghost {
+    background: var(--bg-card);
+    color: var(--text-2);
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+}
+.btn-ghost:hover:not(:disabled) {
+    background: var(--bg-elevated);
+    border-color: var(--border-hover);
+    color: var(--text-1);
+}
+.btn-ghost:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn svg { width: 16px; height: 16px; }
+
+/* ===== LOADING ===== */
+.loader {
+    display: none; text-align: center;
+    padding: 56px 0;
+}
+.loader.show { display: block; }
+.loader-ring {
+    width: 48px; height: 48px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.75s linear infinite;
+    margin: 0 auto 20px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loader-text {
+    font-size: 14px; color: var(--text-3);
+    font-family: 'DM Mono', monospace;
+}
+
+/* ===== RESULTS ===== */
+.results { display: none; margin-top: 48px; }
+.results.show { display: block; animation: fadeUp 0.5s ease; }
+
+.section-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--accent);
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 10px;
+}
+.section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, var(--border), transparent);
+}
+
+/* Cards */
+.panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 20px;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+}
+.panel:hover {
+    border-color: var(--border-hover);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+}
+
+/* Image Grid */
+.img-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+@media (max-width: 600px) { .img-grid { grid-template-columns: 1fr; } }
+.img-frame {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px;
+    text-align: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+}
+.img-frame img {
+    width: 100%;
+    border-radius: 12px;
+    margin-bottom: 10px;
+    box-shadow: 0 3px 14px rgba(0,0,0,0.06);
+}
+.img-frame .tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* Diagnosis */
+.dx-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+.dx-name {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    line-height: 1.2;
+    color: var(--text-1);
+}
+.dx-code {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--text-3);
+    margin-top: 4px;
+}
+.pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 16px;
+    border-radius: 100px;
+    font-size: 12px; font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+.pill-benign { background: rgba(13,148,136,0.08); color: #0d9488; }
+.pill-cancerous { background: rgba(225,29,72,0.07); color: #e11d48; }
+.pill-precancerous { background: rgba(217,119,6,0.07); color: #d97706; }
+.pill-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+/* Confidence */
+.conf-section { margin: 24px 0; }
+.conf-header {
+    display: flex; justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+}
+.conf-label { font-size: 13px; color: var(--text-3); font-weight: 500; }
+.conf-value {
+    font-family: 'DM Mono', monospace;
+    font-size: 24px; font-weight: 700;
+    color: var(--accent);
+}
+.conf-track {
+    height: 8px;
+    background: var(--bg-elevated);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.conf-bar {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #0d9488, #0284c7);
+    transition: width 1.2s cubic-bezier(0.4,0,0.2,1);
+    box-shadow: 0 0 10px rgba(13,148,136,0.15);
+}
+
+/* Predictions */
+.pred-list { margin-top: 20px; }
+.pred-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--bg-elevated);
+    font-size: 13px;
+}
+.pred-item:last-child { border-bottom: none; }
+.pred-name {
+    font-family: 'DM Mono', monospace;
+    color: var(--text-2);
+    width: 80px;
+}
+.pred-bar-wrap {
+    flex: 1;
+    height: 5px;
+    background: var(--bg-elevated);
+    border-radius: 3px;
+    margin: 0 16px;
+    overflow: hidden;
+}
+.pred-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--accent);
+    opacity: 0.45;
+    transition: width 1s ease;
+}
+.pred-pct {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--text-3);
+    width: 50px;
+    text-align: right;
+}
+
+/* Explanation */
+.explanation {
+    font-size: 15px;
+    line-height: 1.85;
+    color: var(--text-2);
+}
+.explanation .cursor-blink {
+    display: inline-block;
+    width: 2px; height: 18px;
+    background: var(--accent);
+    margin-left: 3px;
+    vertical-align: text-bottom;
+    animation: blink 0.7s step-end infinite;
+}
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+/* Disclaimer */
+.disclaimer {
+    margin-top: 36px;
+    padding: 18px 24px;
+    background: rgba(225,29,72,0.04);
+    border: 1px solid rgba(225,29,72,0.08);
+    border-radius: 14px;
+    font-size: 12px;
+    color: #9a5565;
+    line-height: 1.7;
+}
+.disclaimer strong { color: #b8445a; }
+
+/* Footer */
+.footer {
+    text-align: center;
+    padding: 40px 24px;
+    font-size: 12px;
+    color: var(--text-3);
+    border-top: 1px solid var(--border);
+    margin-top: 60px;
+}
+    </style>
+</head>
+<body>
+<nav class="nav">
+    <div class="nav-brand">
+        <div class="nav-logo">🔬</div>
+        <div>
+            <div class="nav-title"><span>Med</span>Lens</div>
+        </div>
+        <div class="nav-tag">v1.0</div>
+    </div>
+    <div class="nav-status">
+        <div class="nav-dot"></div>
+        Model Active — EfficientNet-B0 + LLaMA 3
+    </div>
+</nav>
+
+<div class="container">
+    <div class="hero">
+        <h1>Skin Lesion<br><span class="highlight">AI Analysis</span></h1>
+        <p>Upload a dermoscopic image for AI-powered classification, explainability heatmaps, and a detailed medical explanation.</p>
+    </div>
+    <div class="upload-area" id="upload-zone" onclick="document.getElementById('file-input').click()">
+        <div id="upload-content">
+            <div class="upload-icon-wrap">📷</div>
+            <div class="upload-title">Drop your image here</div>
+            <div class="upload-sub">or click to browse — <kbd>JPG</kbd> <kbd>PNG</kbd></div>
+        </div>
+        <input type="file" id="file-input" accept="image/*">
+    </div>
+    <div class="actions">
+        <button class="btn btn-accent" id="analyze-btn" disabled onclick="analyzeImage()">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            Analyze
+        </button>
+        <button class="btn btn-ghost" id="report-btn" disabled onclick="downloadReport()">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+            PDF Report
+        </button>
+        <button class="btn btn-ghost" id="heatmap-dl-btn" disabled onclick="downloadHeatmap()">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            Heatmap
+        </button>
+    </div>
+    <div class="loader" id="loading">
+        <div class="loader-ring"></div>
+        <div class="loader-text">Running inference pipeline...</div>
+    </div>
+    <div class="results" id="results">
+
+        <div class="section-label">Imaging</div>
+        <div class="img-grid">
+            <div class="img-frame">
+                <img id="original-img" src="" alt="Original">
+                <div class="tag">Original</div>
+            </div>
+            <div class="img-frame">
+                <img id="heatmap-img" src="" alt="Grad-CAM">
+                <div class="tag">Grad-CAM Attention</div>
+            </div>
+        </div>
+
+        <div class="section-label">Diagnosis</div>
+        <div class="panel">
+            <div class="dx-top">
+                <div>
+                    <div class="dx-name" id="dx-name">—</div>
+                    <div class="dx-code" id="dx-code"></div>
+                </div>
+                <div class="pill" id="severity-pill">
+                    <div class="pill-dot"></div>
+                    <span>—</span>
+                </div>
+            </div>
+            <div class="conf-section">
+                <div class="conf-header">
+                    <span class="conf-label">Model Confidence</span>
+                    <span class="conf-value" id="conf-value">—</span>
+                </div>
+                <div class="conf-track">
+                    <div class="conf-bar" id="conf-bar" style="width:0%"></div>
+                </div>
+            </div>
+            <div class="pred-list" id="pred-list"></div>
+        </div>
+
+        <div class="section-label">AI Explanation</div>
+        <div class="panel">
+            <div class="explanation" id="explanation-text"></div>
+        </div>
+
+        <div class="disclaimer">
+            <strong>⚠ Important:</strong> MedLens is an AI screening tool and does NOT provide medical diagnoses.
+            The model accuracy is ~82%. Image quality and lighting affect results.
+            Always consult a qualified dermatologist for proper evaluation and treatment.
+        <!-- Find Dermatologist -->
+        <div class="section-label" id="derm-section" style="display:none; margin-top:36px;">Find Help</div>
+        <div class="panel" id="derm-panel" style="display:none;">
+            <div class="dx-top" style="margin-bottom:20px;">
+                <div>
+                    <div class="dx-name" style="font-size:20px;">Find a Dermatologist Near You</div>
+                    <div class="dx-code">Based on your current location</div>
+                </div>
+                <button class="btn btn-accent" id="locate-btn" onclick="findDermatologists()">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    Use My Location
+                </button>
+            </div>
+            <div id="map-container" style="display:none;">
+                <iframe id="map-frame" width="100%" height="350" style="border:none; border-radius:12px; margin-bottom:16px;" allowfullscreen loading="lazy"></iframe>
+                <a id="map-link" href="#" target="_blank" class="btn btn-ghost" style="width:100%; justify-content:center; text-decoration:none;">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                    Open in Google Maps
+                </a>
+            </div>
+            <div id="map-error" style="display:none; color:var(--danger); font-size:13px; text-align:center; padding:20px;">
+                Location access denied. Please enable location in your browser settings.
+            </div>
+        </div>
+        </div>
+    </div>
+</div>
+
+<div class="footer">
+    MedLens — Built with EfficientNet-B0, Grad-CAM, RAG + LLaMA 3<br>
+    Final Year Project — 2026
+</div>
+
+<script>
+const API = 'http://localhost:8000';
+let selectedFile = null;
+let heatmapBase64 = null;
+const fileInput = document.getElementById('file-input');
+const zone = document.getElementById('upload-zone');
+
+fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('dragover');
+    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+
+function handleFile(file) {
+    selectedFile = file;
+    const reader = new FileReader();
+    reader.onload = e => {
+        document.getElementById('upload-content').innerHTML =
+            `<img class="upload-preview" src="${e.target.result}">`;
+        zone.classList.add('has-image');
+        document.getElementById('original-img').src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+    document.getElementById('analyze-btn').disabled = false;
+    document.getElementById('results').classList.remove('show');
+    document.getElementById('report-btn').disabled = true;
+    document.getElementById('heatmap-dl-btn').disabled = true;
+}
+async function analyzeImage() {
+    if (!selectedFile) return;
+
+    document.getElementById('loading').classList.add('show');
+    document.getElementById('results').classList.remove('show');
+    document.getElementById('analyze-btn').disabled = true;
+    document.getElementById('explanation-text').innerHTML = '';
+    heatmapBase64 = null;
+
+    const form = new FormData();
+    form.append('file', selectedFile);
+
+    try {
+        const res = await fetch(`${API}/analyze`, { method: 'POST', body: form });
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+
+        document.getElementById('loading').classList.remove('show');
+        document.getElementById('results').classList.add('show');
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+            const lines = buf.split('\n\n');
+            buf = lines.pop();
+
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const d = JSON.parse(line.slice(6));
+                if (d.type === 'classification') renderDiagnosis(d);
+                else if (d.type === 'heatmap') renderHeatmap(d);
+                else if (d.type === 'llm_chunk') appendText(d.content);
+                else if (d.type === 'done') onComplete();
+            }
+        }
+    } catch (e) {
+        document.getElementById('loading').classList.remove('show');
+        alert('Connection error — is the backend running?');
+    }
+    document.getElementById('analyze-btn').disabled = false;
+}
+
+function renderDiagnosis(d) {
+    document.getElementById('dx-name').textContent = d.class_name;
+    document.getElementById('dx-code').textContent = `Code: ${d.class_code} · Urgency: ${d.urgency}`;
+    document.getElementById('conf-value').textContent = (d.confidence * 100).toFixed(1) + '%';
+    document.getElementById('conf-bar').style.width = (d.confidence * 100) + '%';
+
+    const pill = document.getElementById('severity-pill');
+    pill.querySelector('span').textContent = d.severity;
+    pill.className = 'pill';
+    if (d.severity.includes('cancer') && !d.severity.includes('pre')) pill.classList.add('pill-cancerous');
+    else if (d.severity.includes('pre')) pill.classList.add('pill-precancerous');
+    else pill.classList.add('pill-benign');
+
+    document.getElementById('pred-list').innerHTML = d.all_predictions.map(([cls, conf]) =>
+        `<div class="pred-item">
+            <span class="pred-name">${cls}</span>
+            <div class="pred-bar-wrap"><div class="pred-bar-fill" style="width:${conf*100}%"></div></div>
+            <span class="pred-pct">${(conf*100).toFixed(1)}%</span>
+        </div>`
+    ).join('');
+}
+
+function renderHeatmap(d) {
+    heatmapBase64 = d.image;
+    document.getElementById('heatmap-img').src = 'data:image/png;base64,' + d.image;
+    document.getElementById('heatmap-dl-btn').disabled = false;
+}
+
+function appendText(t) {
+    const el = document.getElementById('explanation-text');
+    const c = el.querySelector('.cursor-blink');
+    if (c) c.remove();
+    el.innerHTML += t.replace(/\n/g, '<br>');
+    el.innerHTML += '<span class="cursor-blink"></span>';
+}
+
+function onComplete() {
+    const c = document.querySelector('.cursor-blink');
+    if (c) c.remove();
+    document.getElementById('report-btn').disabled = false;
+    showDermSection();
+}
+
+// Downloads
+async function downloadReport() {
+    if (!selectedFile) return;
+    const btn = document.getElementById('report-btn');
+    btn.disabled = true;
+    btn.querySelector('span') || btn.insertAdjacentHTML('beforeend', '');
+    const orig = btn.innerHTML;
+    btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" class="spin"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Generating...`;
+
+    const form = new FormData();
+    form.append('file', selectedFile);
+    try {
+        const res = await fetch(`${API}/report`, { method: 'POST', body: form });
+        const blob = await res.blob();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'MedLens_Report.pdf';
+        a.click();
+        URL.revokeObjectURL(a.href);
+    } catch (e) { alert('Report generation failed.'); }
+
+    btn.innerHTML = orig;
+    btn.disabled = false;
+}
+
+function downloadHeatmap() {
+    if (!heatmapBase64) return;
+    const a = document.createElement('a');
+    a.href = 'data:image/png;base64,' + heatmapBase64;
+    a.download = 'MedLens_GradCAM.png';
+    a.click();
+}
+function showDermSection() {
+    document.getElementById('derm-section').style.display = 'flex';
+    document.getElementById('derm-panel').style.display = 'block';
+}
+
+function findDermatologists() {
+    const btn = document.getElementById('locate-btn');
+    btn.disabled = true;
+    btn.innerHTML = `<div class="loader-ring" style="width:18px;height:18px;margin:0;border-width:2px;"></div> Locating...`;
+
+    if (!navigator.geolocation) {
+        document.getElementById('map-error').style.display = 'block';
+        document.getElementById('map-error').textContent = 'Geolocation is not supported by your browser.';
+        btn.disabled = false;
+        btn.innerHTML = 'Use My Location';
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+
+            // Show embedded map with dermatologist search
+            const query = encodeURIComponent('dermatologist');
+            const mapSrc = `https://www.google.com/maps/embed/v1/search?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${query}&center=${lat},${lng}&zoom=13`;
+
+            document.getElementById('map-frame').src = mapSrc;
+            document.getElementById('map-container').style.display = 'block';
+            document.getElementById('map-error').style.display = 'none';
+
+            const mapsUrl = `https://www.google.com/maps/search/dermatologist/@${lat},${lng},13z`;
+            document.getElementById('map-link').href = mapsUrl;
+
+            btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Location Found`;
+            btn.disabled = false;
+        },
+        (err) => {
+            document.getElementById('map-error').style.display = 'block';
+            document.getElementById('map-container').style.display = 'none';
+            btn.disabled = false;
+            btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg> Try Again`;
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+    );
+}
+</script>
+
+</body>
+</html>
